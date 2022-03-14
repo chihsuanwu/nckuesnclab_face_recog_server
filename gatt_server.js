@@ -1,48 +1,86 @@
-var bleno = require('bleno');
+var bleno = require('@abandonware/bleno');
 var util = require('util');
 var os = require('os');
 var exec = require('child_process').exec;
 
+var fs = require('fs')
+var img = undefined;
+var len = 0;
+
+fs.readFile('result.jpg', function(err, data) {
+  console.log("load image")
+  console.log(data);
+  console.log("length:" + data.length);
+  len = data.length;
+  img = data;
+})
+
+
+start = 0;
 
 
 var Descriptor = bleno.Descriptor;
 var Characteristic = bleno.Characteristic;
 
-var BatteryLevelCharacteristic = function() {
-  BatteryLevelCharacteristic.super_.call(this, {
+function MyCharacteristic() {
+  MyCharacteristic.super_.call(this, {
     uuid: '2A19',
-    properties: ['read'],
-    descriptors: [
-      new Descriptor({
-        uuid: '2901',
-        value: 'Battery level between 0 and 100 percent'
-      }),
-      new Descriptor({
-        uuid: '2904',
-        value: new Buffer([0x04, 0x01, 0x27, 0xAD, 0x01, 0x00, 0x00 ]) // maybe 12 0xC unsigned 8 bit
-      })
-    ]
+    properties: ['notify']
   });
 };
 
-util.inherits(BatteryLevelCharacteristic, Characteristic);
+util.inherits(MyCharacteristic, Characteristic);
 
-BatteryLevelCharacteristic.prototype.onReadRequest = function(offset, callback) {
-  if (os.platform() === 'darwin') {
-    exec('pmset -g batt', function (error, stdout, stderr) {
-      var data = stdout.toString();
-      // data - 'Now drawing from \'Battery Power\'\n -InternalBattery-0\t95%; discharging; 4:11 remaining\n'
-      var percent = data.split('\t')[1].split(';')[0];
-      console.log(percent);
-      percent = parseInt(percent, 10);
-      callback(this.RESULT_SUCCESS, new Buffer([percent]));
-    });
-  } else {
-    // return hardcoded value
-    callback(this.RESULT_SUCCESS, new Buffer([98]));
-  }
+
+var callback = undefined;
+var blocks = 0;
+var maxSize = 0;
+
+MyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
+  console.log(maxValueSize);
+  start = 0;
+  maxSize = maxValueSize - 2;
+  blocks = Math.floor(len / maxSize);
+
+  callback = updateValueCallback;
+
+  let index = [Math.floor(blocks / 256), blocks % 256];
+  let buffer = Buffer.concat([Buffer.from(index), img.slice(start,start+maxSize)]);
+  callback(buffer);
 };
 
+MyCharacteristic.prototype.onNotify = function() {
+
+
+  start += maxSize;
+  blocks -= 1;
+  if (blocks >= 0) {
+    console.log("on notify, start: " + start + ", blocks: " + blocks);
+    let index = [Math.floor(blocks / 256), blocks % 256];
+    let buffer = Buffer.concat([Buffer.from(index), img.slice(start,start+maxSize)]);
+    callback(buffer);
+  } 
+};
+
+
+
+
+function MyCharacteristic2() {
+  MyCharacteristic2.super_.call(this, {
+    uuid: '2A18',
+    properties: ['write']
+  });
+};
+
+util.inherits(MyCharacteristic2, Characteristic);
+
+MyCharacteristic2.prototype.onWriteRequest = function(data, offset, withoutResponse, callback){
+  console.log(data);
+
+var result = Characteristic.RESULT_SUCCESS;
+
+callback(result);
+};
 
 
 
@@ -50,23 +88,24 @@ BatteryLevelCharacteristic.prototype.onReadRequest = function(offset, callback) 
 
 var BlenoPrimaryService = bleno.PrimaryService;
 
-function BatteryService() {
-  BatteryService.super_.call(this, {
-      uuid: '180F',
+function MyService() {
+  MyService.super_.call(this, {
+      uuid: '180F ',
       characteristics: [
-          new BatteryLevelCharacteristic()
+          new MyCharacteristic(),
+          new MyCharacteristic2(),
       ]
   });
 }
 
-util.inherits(BatteryService, BlenoPrimaryService);
+util.inherits(MyService, BlenoPrimaryService);
 
 
 
 
 
 
-var primaryService = new BatteryService();
+var primaryService = new MyService();
 
 bleno.on('stateChange', function(state) {
   console.log('on -> stateChange: ' + state);
@@ -88,6 +127,10 @@ bleno.on('advertisingStart', function(error) {
   }
 });
 
+bleno.on('accept', function(clientAddress) {
+  console.log('on -> accept: ' + (clientAddress));
+
+});
 
 
 
