@@ -3,11 +3,12 @@ var util = require('util');
 var os = require('os');
 var exec = require('child_process').exec;
 
+// Load image
 var fs = require('fs')
 var img = undefined;
 var len = 0;
 
-fs.readFile('result.jpg', function(err, data) {
+fs.readFile('new.jpg', function(err, data) {
   console.log("load image")
   console.log(data);
   console.log("length:" + data.length);
@@ -16,97 +17,103 @@ fs.readFile('result.jpg', function(err, data) {
 })
 
 
-start = 0;
+const Characteristic = bleno.Characteristic;
 
 
-var Descriptor = bleno.Descriptor;
-var Characteristic = bleno.Characteristic;
+// For sending image
+class MyCharacteristic extends Characteristic {
+  constructor() {
+    super(
+      {
+        uuid: '2A19',
+        properties: ['notify']
+      }
+    );
 
-function MyCharacteristic() {
-  MyCharacteristic.super_.call(this, {
-    uuid: '2A19',
-    properties: ['notify']
-  });
-};
+    
+    this.callback = undefined; // notify update value callback
 
-util.inherits(MyCharacteristic, Characteristic);
+    this.start = 0;
 
+    this.blocks = 0;
+    this.maxSize = 0;
+  }
 
-var callback = undefined;
-var blocks = 0;
-var maxSize = 0;
+  onSubscribe(maxValueSize, updateValueCallback) {
+    console.log(maxValueSize);
+    this.start = 0;
+    this.maxSize = maxValueSize - 2;
+    this.blocks = Math.floor(len / this.maxSize);
+  
+    this.callback = updateValueCallback;
+  
+    this.sendData();
+  };
 
-MyCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
-  console.log(maxValueSize);
-  start = 0;
-  maxSize = maxValueSize - 2;
-  blocks = Math.floor(len / maxSize);
+  onNotify() {
+    this.start += this.maxSize;
+    this.blocks -= 1;
 
-  callback = updateValueCallback;
+    // If not finish sending all 
+    if (this.blocks >= 0) {
+      console.log("on notify, start: " + this.start + ", blocks: " + this.blocks);
+      
+      this.sendData();
+    } 
+  };
 
-  let index = [Math.floor(blocks / 256), blocks % 256];
-  let buffer = Buffer.concat([Buffer.from(index), img.slice(start,start+maxSize)]);
-  callback(buffer);
-};
-
-MyCharacteristic.prototype.onNotify = function() {
-
-
-  start += maxSize;
-  blocks -= 1;
-  if (blocks >= 0) {
-    console.log("on notify, start: " + start + ", blocks: " + blocks);
-    let index = [Math.floor(blocks / 256), blocks % 256];
-    let buffer = Buffer.concat([Buffer.from(index), img.slice(start,start+maxSize)]);
-    callback(buffer);
-  } 
-};
-
-
-
-
-function MyCharacteristic2() {
-  MyCharacteristic2.super_.call(this, {
-    uuid: '2A18',
-    properties: ['write']
-  });
-};
-
-util.inherits(MyCharacteristic2, Characteristic);
-
-MyCharacteristic2.prototype.onWriteRequest = function(data, offset, withoutResponse, callback){
-  console.log(data);
-
-var result = Characteristic.RESULT_SUCCESS;
-
-callback(result);
-};
-
-
-
-
-
-var BlenoPrimaryService = bleno.PrimaryService;
-
-function MyService() {
-  MyService.super_.call(this, {
-      uuid: '180F ',
-      characteristics: [
-          new MyCharacteristic(),
-          new MyCharacteristic2(),
-      ]
-  });
+  sendData() {
+    // calc index
+    let index = [Math.floor(this.blocks / 256), this.blocks % 256];
+    // load part of img to buffer
+    let buffer = Buffer.concat([Buffer.from(index), img.slice(this.start, this.start + this.maxSize)]);
+    // update data
+    this.callback(buffer);
+  }
 }
 
-util.inherits(MyService, BlenoPrimaryService);
+
+// TEST write, currently uselss
+class MyCharacteristic2 extends Characteristic {
+  constructor() {
+    super(
+      {
+        uuid: '2A18',
+        properties: ['write']
+      }
+    );
+  }
+
+  onWriteRequest(data, offset, withoutResponse, callback) {
+    console.log(data);
+  
+    var result = Characteristic.RESULT_SUCCESS;
+  
+    callback(result);
+  };
+}
 
 
+const BlenoPrimaryService = bleno.PrimaryService;
+
+class MyService extends BlenoPrimaryService {
+  constructor() {
+    super(
+      {
+        uuid: '180F ',
+        characteristics: [
+          new MyCharacteristic(),
+          new MyCharacteristic2(),
+        ]
+      }
+    );
+  }
+}
 
 
+const primaryService = new MyService();
 
-
-var primaryService = new MyService();
-
+// Below is some basic BLE event
 bleno.on('stateChange', function(state) {
   console.log('on -> stateChange: ' + state);
 
@@ -129,7 +136,6 @@ bleno.on('advertisingStart', function(error) {
 
 bleno.on('accept', function(clientAddress) {
   console.log('on -> accept: ' + (clientAddress));
-
 });
 
 
