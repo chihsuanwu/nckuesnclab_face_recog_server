@@ -1,0 +1,34 @@
+
+[
+    {
+        "firstDate": "2022-05-18 14:33",
+        "images": [
+            {
+                "path": "images/2f9416b8a71aba3e2f73584d202a63e4",
+                "time": "2022-05-18 14:33"
+            },
+            {
+                "path": "images/657595e3a6b7f54123d63eaaaa965efb",
+                "time": "2022-05-18 14:34"
+            },
+            {
+                "path": "images/de22ed4e056f89cef2cfadce67ed3cd1",
+                "time": "2022-05-18 14:35"
+            }
+        ]
+    },
+    {
+        "firstDate": "2022-05-18 14:45",
+        "images": [
+            {
+                "path": "images/f5e17e7dc954ab3996a3bfcbc7a3f096",
+                "time": "2022-05-18 14:45"
+            },
+            {
+                "path": "images/eb42b0eb2931ea4a1a1f97ccc36e43c8",
+                "time": "2022-05-18 14:46"
+            }
+        ]
+    }
+]
+
