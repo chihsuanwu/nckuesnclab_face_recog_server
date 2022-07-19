@@ -11,7 +11,7 @@ class MyService extends BlenoPrimaryService {
     constructor() {
         super(
             {
-                uuid: '180F ',
+                uuid: '180F',
                 characteristics: [
                     new ImageCharacterestic(),
                     new SendJsonCharacteristic(),
@@ -30,7 +30,7 @@ bleno.on('stateChange', function(state) {
     console.log('on -> stateChange: ' + state);
 
     if (state === 'poweredOn') {
-        bleno.startAdvertising('Battery', [primaryService.uuid]);
+        bleno.startAdvertising('NCLAB', [primaryService.uuid]);
     } else {
         bleno.stopAdvertising();
     }
